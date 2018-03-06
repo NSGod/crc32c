@@ -18,8 +18,11 @@ static uint32_t crc32c_CPUDetection(uint32_t crc, const void* data, size_t lengt
 
 CRC32CFunctionPtr crc32c = crc32c_CPUDetection;
 
+#if !((defined __ppc__) || (defined __ppc64__))
+
 // Use the compiler's cpuid, if it exists.
 #if (defined __GNUC__) || (defined __clang__)
+
 #include <cpuid.h>
 
 static uint32_t cpuid(uint32_t functionInput) {
@@ -27,11 +30,12 @@ static uint32_t cpuid(uint32_t functionInput) {
   uint32_t ebx;
   uint32_t ecx;
   uint32_t edx;
-  __cpuid(functionInput, eax, ebx, ecx, edx);
+  __get_cpuid(functionInput, &eax, &ebx, &ecx, &edx);
   return ecx;
 }
 
-#else
+#else // (defined __GNUC__) || (defined __clang__)
+
 // Basic implementation.  Seems to only cover x86, not x64.
 static uint32_t cpuid(uint32_t functionInput) {
     uint32_t eax;
@@ -45,26 +49,31 @@ static uint32_t cpuid(uint32_t functionInput) {
             "cpuid\n\t"
             "movl %%ebx, %[ebx]\n\t" /* save what cpuid just put in %ebx */
             "popl %%ebx" : "=a"(eax), [ebx] "=r"(ebx), "=c"(ecx), "=d"(edx) : "a" (functionInput) : "cc");
-#else
+#else // def __PIC__
     __asm__("cpuid" : "=a" (eax), "=b" (ebx), "=c" (ecx), "=d" (edx) : "a" (functionInput));
-#endif
+#endif // def __PIC__
     return ecx;
 }
-#endif
+#endif // (defined __GNUC__) || (defined __clang__)
+#endif // !((defined __ppc__) || (defined __ppc64__))
 
 CRC32CFunctionPtr detectBestCRC32C() {
+#if ((defined __ppc__) || (defined __ppc64__))
+    return crc32cSlicingBy8;
+#else // ((defined __ppc__) || (defined __ppc64__))
     static const int SSE42_BIT = 20;
     uint32_t ecx = cpuid(1);
     bool hasSSE42 = ecx & (1 << SSE42_BIT);
     if (hasSSE42) {
 #ifdef __LP64__
         return crc32cHardware64;
-#else
+#else // def __LP64__
         return crc32cHardware32;
-#endif
+#endif // def __LP64__
     } else {
         return crc32cSlicingBy8;
     }
+#endif // ((defined __ppc__) || (defined __ppc64__))
 }
 
 // Implementations adapted from Intel's Slicing By 8 Sourceforge Project
@@ -162,6 +171,7 @@ uint32_t crc32cSlicingBy8(uint32_t crc, const void* data, size_t length) {
     return crc;
 }
 
+#if !((defined __ppc__) || (defined __ppc64__))
 // Hardware-accelerated CRC-32C (using CRC32 instruction)
 uint32_t crc32cHardware32(uint32_t crc, const void* data, size_t length) {
     const char* p_buf = (const char*) data;
@@ -251,3 +261,5 @@ uint32_t crc32cHardware64(uint32_t crc, const void* data, size_t length) {
     return crc32bit;
 #endif
 }
+
+#endif // !((defined __ppc__) || (defined __ppc64__))

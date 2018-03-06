@@ -33,7 +33,7 @@ typedef uint32_t (*CRC32CFunctionPtr)(uint32_t crc, const void* data, size_t len
 /** This will map automatically to the "best" CRC implementation. */
 extern CRC32CFunctionPtr crc32c;
 
-CRC32CFunctionPtr detectBestCRC32C();
+CRC32CFunctionPtr detectBestCRC32C(void);
 
 /** Converts a partial CRC32-C computation to the final value. */
 static inline uint32_t crc32cFinish(uint32_t crc) {
@@ -43,9 +43,12 @@ static inline uint32_t crc32cFinish(uint32_t crc) {
 uint32_t crc32cSarwate(uint32_t crc, const void* data, size_t length);
 uint32_t crc32cSlicingBy4(uint32_t crc, const void* data, size_t length);
 uint32_t crc32cSlicingBy8(uint32_t crc, const void* data, size_t length);
+    
+#if !((defined __ppc__) || (defined __ppc64__))
 uint32_t crc32cHardware32(uint32_t crc, const void* data, size_t length);
 uint32_t crc32cHardware64(uint32_t crc, const void* data, size_t length);
-
+#endif // !((defined __ppc__) || (defined __ppc64__))
+    
 #if defined(__cplusplus)
 }  // namespace logging
 #endif
